@@ -74,3 +74,203 @@ export default function Navbar() {
   );
 }
 ```
+
+# setup stream (Stream video context provider)
+
+link : https://getstream.io/video/sdk/react/tutorial/video-calling/
+
+- tạo provider bọc ngoaif src/app/ClientProvider.tsx
+
+```ts
+"use client";
+
+import { useUser } from "@clerk/nextjs";
+import { StreamVideo, StreamVideoClient } from "@stream-io/video-react-sdk";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
+
+interface ClientProviderProps {
+  children: React.ReactNode;
+}
+export default function ClientProvider({ children }: ClientProviderProps) {
+  const videoClient = useInitalizeVideoClient();
+
+  if (!videoClient) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="mx-auto animate-spin" />
+      </div>
+    );
+  }
+
+  return <StreamVideo client={videoClient}>{children}</StreamVideo>;
+}
+function useInitalizeVideoClient() {
+  const { user, isLoaded: userLoader } = useUser();
+  const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(
+    null,
+  );
+
+  return videoClient;
+}
+
+```
+
+bọc nó tại layout to nhất
+
+```ts
+<ClerkProvider>
+      <html lang="en">
+        <body className={inter.className}>
+          <ClientProvider>
+            <Navbar />
+            <main className="mx-auto max-w-5xl px-3 py-6 ">{children}</main>
+          </ClientProvider>
+        </body>
+      </html>
+    </ClerkProvider>
+```
+
+viết tiếp hàm func useIi... trong provider
+
+```ts
+function useInitalizeVideoClient() {
+  const { user, isLoaded: userLoader } = useUser();
+  const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!userLoader) return;
+    let streamUser: User;
+    if (user?.id) {
+      streamUser = {
+        id: user.id,
+        name: user.username || user.id,
+        image: user.imageUrl,
+      };
+    } else {
+      const id = nanoid();
+      streamUser = {
+        id,
+        type: "guest",
+        name: `Guest ${id}`,
+      };
+    }
+    const client = new StreamVideoClient({
+      apiKey: process.env.NEXT_PUBLIC_STREAM_API_KEY || "",
+      user: streamUser,
+      tokenProvider : ,
+    });
+  }, []);
+  return videoClient;
+}
+```
+
+(chưa xong)
+
+viết 1 cái server actions để lấy cái tokenPrivider kia
+/app/actions.ts
+
+```ts
+"use server";
+
+import { currentUser } from "@clerk/nextjs/server";
+import { StreamClient } from "@stream-io/node-sdk";
+
+export async function getToken() {
+  const streamApiKey = process.env.NEXT_PUBLIC_STREAM_VIDEO_API_KEY;
+  const streamApiSecret = process.env.STREAM_VIDEO_API_SERCET;
+
+  if (!streamApiKey || !streamApiSecret) {
+    throw new Error("Stream API key or servcet not set");
+  }
+  const user = await currentUser();
+  console.log("Generating token for user ", user?.id);
+  if (!user) {
+    throw new Error("User not authenticated");
+  }
+  const streamClient = new StreamClient(streamApiKey, streamApiSecret);
+
+  const expirationTime = Math.floor(Date.now() / 1000) + 60 * 60;
+
+  const issuedAt = Math.floor(Date.now() / 1000) - 60;
+  const token = streamClient.createToken(user.id, expirationTime, issuedAt);
+
+  console.log("Successfully generated token: ", token);
+
+  return token;
+}
+```
+
+chốt lại file ClientProvider.tsx
+
+```ts
+"use client";
+
+import { getToken } from "@/app/actions";
+import { useUser } from "@clerk/nextjs";
+import {
+  StreamVideo,
+  StreamVideoClient,
+  User,
+} from "@stream-io/video-react-sdk";
+import { Loader2 } from "lucide-react";
+import { nanoid } from "nanoid";
+import { useEffect, useState } from "react";
+
+interface ClientProviderProps {
+  children: React.ReactNode;
+}
+export default function ClientProvider({ children }: ClientProviderProps) {
+  const videoClient = useInitalizeVideoClient();
+
+  if (!videoClient) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="mx-auto animate-spin" />
+      </div>
+    );
+  }
+
+  return <StreamVideo client={videoClient}>{children}</StreamVideo>;
+}
+function useInitalizeVideoClient() {
+  const { user, isLoaded: userLoader } = useUser();
+  const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!userLoader) return;
+    let streamUser: User;
+    if (user?.id) {
+      streamUser = {
+        id: user.id,
+        name: user.username || user.id,
+        image: user.imageUrl,
+      };
+    } else {
+      const id = nanoid();
+      streamUser = {
+        id,
+        type: "guest",
+        name: `Guest ${id}`,
+      };
+    }
+    const apikey = process.env.NEXT_PUBLIC_STREAM_VIDEO_API_KEY;
+    if (!apikey) throw new Error("Stream API key or servcet not set");
+    const client = new StreamVideoClient({
+      apiKey: apikey,
+      user: streamUser,
+      tokenProvider: user?.id ? getToken : undefined,
+    });
+
+    setVideoClient(client);
+    return () => {
+      client.disconnectUser();
+      setVideoClient(null);
+    };
+  }, [user?.id, user?.imageUrl, user?.username, userLoader]);
+  return videoClient;
+}
+
+```
