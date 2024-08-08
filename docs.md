@@ -274,3 +274,73 @@ function useInitalizeVideoClient() {
 }
 
 ```
+
+create meeting xem commit github
+
+- join
+
+```ts
+"use client";
+
+import {
+  Call,
+  CallControls,
+  SpeakerLayout,
+  StreamCall,
+  StreamTheme,
+  useStreamVideoClient,
+} from "@stream-io/video-react-sdk";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
+
+interface MeetingPageProps {
+  id: string;
+}
+export default function MeetingPage({ id }: MeetingPageProps) {
+  const [call, setCall] = useState<Call>();
+  const client = useStreamVideoClient();
+  if (!client) {
+    return <Loader2 className="mx-auto animate-spin" />;
+  }
+  if (!call) {
+    return (
+      <button
+        onClick={async () => {
+          const call = client.call("default", id);
+          await call.join();
+          setCall(call);
+        }}
+      >
+        Join meeting
+      </button>
+    );
+  }
+  return (
+    <StreamCall call={call}>
+      <StreamTheme className="space-y-3">
+        <SpeakerLayout />
+        <CallControls />
+      </StreamTheme>
+    </StreamCall>
+  );
+}
+
+```
+
+# Custom call types & permissions (private meetings)
+
+vào dashboard chọn video&audio =>chọn call types => xong
+chonj role & permissions => chọn role user và scope là privatemeeting => eidt =>bỏ tích hết rồi ctrl f tìm create call read call => save
+chọn role guest => private metting bỏ tích hết để lại mỗi cái readcall
+role user => scope def => ỏ tích cái end call,tích vào End Update Own Call tương tự với member và primeeting
+
+- tạo 1 actions lấy ra id của người dùng qua email
+
+```ts
+export async function getUserIds(emailAddress: string[]) {
+  const res = await clerkClient.users.getUserList({
+    emailAddress: emailAddress,
+  });
+  return res.map((u) => u.id);
+}
+```
