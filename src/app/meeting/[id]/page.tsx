@@ -6,7 +6,6 @@ import { Metadata } from "next";
 interface PageProps {
   params: {
     id: string;
-    searchParams: { guest: string };
   };
 }
 export function generateMetadata({ params: { id } }: PageProps): Metadata {
@@ -14,14 +13,9 @@ export function generateMetadata({ params: { id } }: PageProps): Metadata {
     title: `Meeting ${id}`,
   };
 }
-export default async function Page({
-  params: {
-    id,
-    searchParams: { guest },
-  },
-}: PageProps) {
-  const guestMode = guest === "true";
+export default async function Page({ params: { id } }: PageProps) {
+  // const guestMode = guest === "true";
   const user = await currentUser();
-  if (!user && !guestMode) return <MeetingLoginPage />;
+  if (!user) return <MeetingLoginPage />;
   return <MeetingPage id={id} />;
 }
