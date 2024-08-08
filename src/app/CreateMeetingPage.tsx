@@ -1,8 +1,13 @@
 "use client";
 
+import { getUserIds } from "@/app/actions";
 import Button from "@/components/Button";
 import { useUser } from "@clerk/nextjs";
-import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
+import {
+  Call,
+  MemberRequest,
+  useStreamVideoClient,
+} from "@stream-io/video-react-sdk";
 import { Copy, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -21,9 +26,28 @@ const CreateMeetingPage = () => {
     if (!client || !user) return;
     try {
       const id = crypto.randomUUID();
-      const call = client.call("default", id);
+      const callType = participantsInput ? "private-meeting" : "default";
+      const call = client.call(callType, id);
+      const membersEmails = participantsInput.split(",").map((e) => e.trim());
+      const memberIds = await getUserIds(membersEmails);
+      const members: MemberRequest[] = memberIds
+        .map((id) => ({
+          user_id: id,
+          role: "call_member",
+        }))
+        .concat({
+          user_id: user.id,
+          role: "call_member",
+        })
+        .filter(
+          (v, i, a) => a.findIndex((v2) => v2.user_id === v.user_id) === i,
+        );
+
+      const starts_at = new Date(startTimeInput || Date.now()).toISOString();
       await call.getOrCreate({
         data: {
+          starts_at,
+          members,
           custom: { description: descriptionInput },
         },
       });
@@ -196,40 +220,40 @@ function MeetingLink({ call }: MeetingLinkProps) {
   const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${call.id}`;
 
   return (
-    // <div className="flex flex-col items-center gap-3 text-center">
-    //   <div className="flex items-center gap-3">
-    //     <span>
-    //       Invitation link:{" "}
-    //       <Link href={meetingLink} className="font-medium">
-    //         {meetingLink}
-    //       </Link>
-    //     </span>
-    //     <button
-    //       title="Copy invitation link"
-    //       onClick={() => {
-    //         navigator.clipboard.writeText(meetingLink);
-    //         alert("Copied to clipboard");
-    //       }}
-    //     >
-    //       <Copy />
-    //     </button>
-    //   </div>
-    //   <a
-    //     href={getMailToLink(
-    //       meetingLink,
-    //       call.state.startsAt,
-    //       call.state.custom.description,
-    //     )}
-    //     target="_blank"
-    //     className="text-blue-500 hover:underline"
-    //   >
-    //     Send email invitation
-    //   </a>
-    // </div>
-    <>{meetingLink}</>
+    <div className="flex w-full flex-col items-center gap-3 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col">
+          Invitation link:
+          <Link href={meetingLink} className="font-medium">
+            {meetingLink}
+          </Link>
+        </div>
+        <button
+          title="Copy invitation link"
+          onClick={() => {
+            navigator.clipboard.writeText(meetingLink);
+            alert("Copied to clipboard");
+          }}
+        >
+          <Copy />
+        </button>
+      </div>
+      <a
+        href={getMailToLink(
+          meetingLink,
+          call.state.startsAt,
+          call.state.custom.description,
+        )}
+        target="_blank"
+        className="text-blue-500 hover:underline"
+      >
+        Send email invitation
+      </a>
+    </div>
+    // <>{meetingLink}</>
   );
 }
-
+//mở ra trang gửi mail với nội dung là body
 function getMailToLink(
   meetingLink: string,
   startsAt?: Date,
