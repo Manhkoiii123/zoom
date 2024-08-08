@@ -76,8 +76,8 @@ const CreateMeetingPage = () => {
         <Button onClick={createMeeting} className="w-full">
           Create meeting
         </Button>
-        {call && <MeetingLink call={call} />}
       </div>
+      {call && <MeetingLink call={call} />}
     </div>
   );
 };
